@@ -1,0 +1,126 @@
+---
+title: "ASX Stocks"
+author: "Vish"
+date: "23/09/2021"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+```
+
+```{r}
+theme_vish1 <-  theme(legend.position = " none",
+                      strip.background = element_rect(fill="grey85", size=1, color="red"),
+                      plot.title = element_text(size=30, hjust = 0.5), 
+                      strip.text = element_text(size=25, colour = "darkblue"),
+                      axis.title.x = element_text(size = 25, colour="black"),
+                      axis.title.y = element_text(size = 25, colour="black"),
+                      plot.subtitle = element_text(size = 15,hjust = 0.5),
+                      axis.text.x = element_text(size = 12.5),
+                      axis.text.y = element_text(size = 12.5),
+                      panel.grid.minor = element_line(colour="grey81", size=0.5),
+                      panel.grid.major = element_line(colour = "grey40"))
+```
+
+
+
+```{r}
+flt_import <- read.csv("ASX_FLT, 1D.csv")
+qan_import <- read.csv("ASX_QAN, 1D.csv")
+web_import <- read.csv("ASX_WEB, 1D.csv")
+apt_import <- read.csv("ASX_APT, 1D.csv")
+kgn_import <- read.csv("ASX_KGN, 1D.csv")
+fmg_import <- read.csv("ASX_FMG, 1D.csv")
+```
+
+```{r}
+flt_data <- flt_import %>% 
+  mutate(Ticker="flt")
+qan_data <- qan_import %>% 
+  mutate(Ticker="qan")
+web_data <- web_import %>% 
+  mutate(Ticker="web")
+apt_data <- apt_import %>% 
+  mutate(Ticker="apt")
+kgn_data <- kgn_import %>% 
+  mutate(Ticker="kgn")
+fmg_data <- fmg_import %>% 
+  mutate(Ticker="fmg")
+```
+
+```{r}
+all_stocks_data <- rbind(flt_data,qan_data,web_data,apt_data,kgn_data,fmg_data)
+```
+
+
+```{r}
+all_stocks <- all_stocks_data %>% 
+  separate(col = time,sep = 'T',into = c("date", "text"),remove = TRUE) %>% 
+  mutate(date=ymd(date)) %>% 
+  select(-c(text,Volume.MA)) %>% 
+  rename('MarketCap' = Mkt.Ñ.ap,
+         'Shares Outstanding'= Total.common.shares.outstanding) %>% 
+  relocate(Ticker, .before = date)
+```
+
+
+```{r}
+pre_covid_data <- all_stocks %>% 
+  filter(date=="2020-02-20")
+
+today_data <- all_stocks %>% 
+  filter(date=="2021-09-22")
+
+combine <- left_join(pre_covid_data,today_data, 
+                     by=c("Ticker"))
+```
+
+```{r}
+combine_data <- combine %>% 
+  mutate('price.precovid'= ((close.y-close.x)/close.x)*100) %>% 
+  mutate('M.cap.precovid'= ((MarketCap.y-MarketCap.x)/MarketCap.x)*100) %>% 
+  mutate('Shares.Change'= `Shares Outstanding.y`-`Shares Outstanding.x`)
+```
+
+```{r}
+combine_plot<- ggplot(combine_data, aes(price.precovid,M.cap.precovid,colour=Ticker))+
+  geom_point()+
+   geom_text(aes(label=Ticker),hjust=0, vjust=-0.35)+
+  geom_hline(yintercept = 0, color = "grey42") +
+   geom_vline(xintercept = 0, color = "grey42")+
+  labs(
+    title = "Price & Market Cap From Pre-Covid", 
+    subtitle = "pre-covid date: 20th Feb 2020", 
+    caption = "vish",
+    x ="Price from Pre-Covid(%)", 
+    y = "Market Cap. from Pre-Covid(%)")+
+  theme(
+    legend.position = " none",
+    plot.title = element_text(hjust = 0.5, size = 15),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)
+  )+
+  scale_y_continuous(breaks = seq(-25, 250, by = 25))+
+  scale_x_continuous(breaks = seq(-50, 250, by = 25))
+
+combine_plot
+
+ggsave(
+"price_mcap_precovid.png",
+combine_plot,
+device = ragg::agg_png(
+width = 8,
+height = 5,
+units = "in",
+scaling = 0.8,
+res = 500
+))
+```
+
+
+
+
